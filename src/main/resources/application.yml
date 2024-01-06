@@ -1,7 +1,7 @@
 spring:
   batch:
     job:
-      names: {job.name:NONE}
+      name: {job.name:NONE}
   jpa:
     hibernate:
       ddl-auto: none
@@ -11,6 +11,6 @@ spring:
         format_sql: true
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/searchstudy?serverTimezone=UTC&characterEncoding=UTF8
+    url: jdbc:mysql://localhost:3306/batch_study?serverTimezone=UTC&characterEncoding=UTF8
     username: root
     password: 1234

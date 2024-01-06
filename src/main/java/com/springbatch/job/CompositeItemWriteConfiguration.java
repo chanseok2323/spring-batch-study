@@ -1,13 +1,14 @@
 package com.springbatch.job;
 
 import com.springbatch.dto.MemberVO;
+import jakarta.persistence.EntityManagerFactory;
 import lombok.RequiredArgsConstructor;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
-import org.springframework.batch.core.configuration.annotation.EnableBatchProcessing;
-import org.springframework.batch.core.configuration.annotation.JobBuilderFactory;
-import org.springframework.batch.core.configuration.annotation.StepBuilderFactory;
+import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.launch.support.RunIdIncrementer;
+import org.springframework.batch.core.repository.JobRepository;
+import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.item.database.JpaPagingItemReader;
 import org.springframework.batch.item.database.builder.JpaPagingItemReaderBuilder;
 import org.springframework.batch.item.file.FlatFileItemWriter;
@@ -18,31 +19,38 @@ import org.springframework.batch.item.support.CompositeItemWriter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
+import org.springframework.transaction.PlatformTransactionManager;
 
-import javax.persistence.EntityManagerFactory;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 @Configuration
-@EnableBatchProcessing
 @RequiredArgsConstructor
-public class CompositeItemWriterJob {
+public class CompositeItemWriteConfiguration {
 
     private final EntityManagerFactory entityManagerFactory;
-    private final StepBuilderFactory stepBuilderFactory;
-    private final JobBuilderFactory jobBuilderFactory;
+    private final JobRepository jobRepository;
+    private final PlatformTransactionManager transactionManager;
 
     @Bean
-    public Job memberJob() {
-        return jobBuilderFactory.get("memberJob").incrementer(new RunIdIncrementer())
-                .start(memberStep()).build();
+    public Job compositeJob() {
+        return new JobBuilder("compositeJob", jobRepository)
+                .incrementer(new RunIdIncrementer())
+                .start(compositeStep())
+                .build();
+//        return jobBuilderFactory.get("memberJob").incrementer(new RunIdIncrementer())
+//                .start(memberStep()).build();
     }
 
     @Bean
-    public Step memberStep() {
-        return stepBuilderFactory.get("memberStep").<MemberVO, MemberVO>chunk(100)
-                .reader(memberPagingItemReader()).writer(compositeMemberItemWriter()).build();
+    public Step compositeStep() {
+        return new StepBuilder("compositeStep", jobRepository)
+                .<MemberVO, MemberVO>chunk(100, transactionManager)
+                .reader(memberPagingItemReader())
+                .writer(compositeMemberItemWriter())
+                .build();
+//        return stepBuilderFactory.get("memberStep").<MemberVO, MemberVO>chunk(100)
+//                .reader(memberPagingItemReader()).writer(compositeMemberItemWriter()).build();
     }
 
     @Bean
@@ -65,16 +73,17 @@ public class CompositeItemWriterJob {
 
     @Bean
     public FlatFileItemWriter<MemberVO> memberFlatFileItemWriter() {
-        DelimitedLineAggregator<MemberVO> lineAggregator = new DelimitedLineAggregator<>();
         BeanWrapperFieldExtractor<MemberVO> extractor = new BeanWrapperFieldExtractor<>();
-        Resource resource = new FileSystemResource("/Users/parkchanseok/data.sam");
         extractor.setNames(new String[] {"userNo", "email", "name", "password", "age"});
+
+        DelimitedLineAggregator<MemberVO> lineAggregator = new DelimitedLineAggregator<>();
         lineAggregator.setDelimiter(",");
         lineAggregator.setFieldExtractor(extractor);
 
         return new FlatFileItemWriterBuilder<MemberVO>()
-                .name("memberFlatFileItemWriter").encoding(StandardCharsets.UTF_8.name())
-                .resource(resource)
+                .name("memberFlatFileItemWriter")
+                .encoding(StandardCharsets.UTF_8.name())
+                .resource(new FileSystemResource("/Users/parkchanseok/data.sam"))
                 .lineAggregator(lineAggregator)
                 .build();
     }
@@ -83,14 +92,13 @@ public class CompositeItemWriterJob {
     public FlatFileItemWriter<MemberVO> memberVOFlatFileItemWriter() {
         DelimitedLineAggregator<MemberVO> lineAggregator = new DelimitedLineAggregator<>();
         BeanWrapperFieldExtractor<MemberVO> extractor = new BeanWrapperFieldExtractor<>();
-        Resource resource = new FileSystemResource("/Users/parkchanseok/data.dat");
         extractor.setNames(new String[] {"userNo", "email", "name", "password", "age"});
         lineAggregator.setDelimiter("|");
         lineAggregator.setFieldExtractor(extractor);
 
         return new FlatFileItemWriterBuilder<MemberVO>()
                 .name("memberFlatFileItemWriter").encoding("MS949")
-                .resource(resource)
+                .resource(new FileSystemResource("/Users/parkchanseok/data.dat"))
                 .lineAggregator(lineAggregator)
                 .build();
     }
